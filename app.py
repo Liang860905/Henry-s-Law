@@ -52,10 +52,10 @@ with st.container(border=True):
             st.session_state.p_val, st.session_state.v_val = 1.0, 2.0
 
     with ctrl_col1:
-        P_ratio = st.slider("🔹 連續調整【實驗組】氣體分壓 (P 倍數)",
+        P_ratio = st.slider("🔹 【實驗組】氣體分壓 (P 倍數)",
                             min_value=0.5, max_value=3.0, step=0.1, key="p_val")
     with ctrl_col2:
-        V_solv_ratio = st.slider("💧 連續調整【實驗組】溶劑體積 (V劑 倍數)",
+        V_solv_ratio = st.slider("💧 【實驗組】溶劑體積 (V劑 倍數)",
                                  min_value=0.5, max_value=2.5, step=0.1, key="v_val")
     with ctrl_col4:
         st.markdown("**🛠️ 教學輔助設定**")
