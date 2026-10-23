@@ -6,9 +6,28 @@ st.set_page_config(page_title="亨利定律互動模擬", layout="wide")
 st.markdown("""
 <style>
 .block-container { padding-top: 1.5rem; padding-bottom: 1rem; }
-.formula-card { border: 1px solid #d9d9d9; border-radius: 10px; padding: 14px 16px; min-height: 150px; margin-bottom: 12px; box-sizing: border-box; }
-.formula-card h4 { margin: 0 0 12px 0; font-size: 1rem; }
-.formula-result { margin-top: 10px; font-weight: 600; }
+
+/* 只固定下方定量關係區的卡片高度，頂部控制面板不受影響 */
+div[data-testid="stHorizontalBlock"] div[data-testid="stVerticalBlockBorderWrapper"] {
+    box-sizing: border-box;
+}
+div[data-testid="stHorizontalBlock"] div[data-testid="stVerticalBlockBorderWrapper"] > div {
+    box-sizing: border-box;
+}
+
+/* 公式區左右欄的每張卡片使用一致高度，讓同列上下邊界對齊 */
+div[data-testid="stHorizontalBlock"] div[data-testid="stVerticalBlockBorderWrapper"] {
+    min-height: 218px;
+}
+
+/* 公式區維持一致的內距與段落間距 */
+div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stMarkdownContainer"] p {
+    margin-bottom: 0.55rem;
+}
+div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stLatex"] {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+}
 </style>
 """, unsafe_allow_html=True)
 
