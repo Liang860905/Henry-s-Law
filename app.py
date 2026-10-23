@@ -451,7 +451,9 @@ with col_exp_math:
             rf"\underbrace{{P_{{\text{{O}}_2}}}}_{{\times {p_str}}} \times "
             rf"\underbrace{{V_{{\text{{劑}}}}}}_{{\times {v_str}}}"
         )
-        st.markdown(f"👉 溶解莫耳數 ($n_{\text{O}_2}$)：{badge_text(n_ratio, quiz_mode)}")
+st.markdown(
+    f"👉 溶解莫耳數 ($n_{{\\text{{O}}_2}}$)：{badge_text(n_ratio, quiz_mode)}"
+)
     with st.container(border=True):
         st.markdown("**4. 溶解氣體質量 ($W_{\text{O}_2}$)**")
         st.latex(
