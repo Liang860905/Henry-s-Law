@@ -93,7 +93,7 @@ function buildGroup(off,p,v,dv,title,color){{
  const hL=LIQH*v,yL=BOTTOM-hL,hD=DVH*dv;
  // 初始氣體體積固定：初始活塞與液面保持固定距離。
  // 溶解平衡後，活塞依 ΔV 向下移動；溶劑體積改變不會改變初始氣體體積。
- const yInit=yL-GASH-BASE_DVH,yEq=yInit+hD,x1=off+55,x2=off+385;
+ const yInit=yL-GASH-DVH,yEq=yInit+hD,x1=off+55,x2=off+385;
  const nl=Math.max(2,Math.round(5*p*v)),ng=Math.max(3,Math.round(10*p));
  return {{off,p,v,dv,title,color,x1,x2,hL,yL,yEq,hD,yInit,
  init:createParticles(ng+nl,x1,x1+CW,yInit+PH,yL,'gas'),
