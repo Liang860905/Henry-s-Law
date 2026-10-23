@@ -1,22 +1,22 @@
-
 import streamlit as st
 import streamlit.components.v1 as components
 
-# 頁面設定
 st.set_page_config(page_title="亨利定律互動模擬", layout="wide")
 
 st.markdown("""
 <style>
-    .block-container { padding-top: 1.5rem; padding-bottom: 1rem; }
+.block-container { padding-top: 1.5rem; padding-bottom: 1rem; }
+.formula-card { border: 1px solid #d9d9d9; border-radius: 10px; padding: 14px 16px; min-height: 150px; margin-bottom: 12px; box-sizing: border-box; }
+.formula-card h4 { margin: 0 0 12px 0; font-size: 1rem; }
+.formula-result { margin-top: 10px; font-weight: 600; }
 </style>
 """, unsafe_allow_html=True)
 
 st.markdown("### 亨利定律整理：於定溫、相同難溶性氣體之情況，該難溶性氣體之分壓與溶解度成正比")
 
-# ================= 頂部控制面板 =================
+# 頂部控制面板
 with st.container(border=True):
     ctrl_col1, ctrl_col2, ctrl_col3, ctrl_col4 = st.columns([1.5, 1.5, 1.2, 1.2])
-
     if "p_val" not in st.session_state:
         st.session_state.p_val = 2.0
     if "v_val" not in st.session_state:
@@ -24,354 +24,154 @@ with st.container(border=True):
 
     with ctrl_col3:
         st.markdown("**⚡ 快速套用課本情境**")
-        btn_c1, btn_c2, btn_c3 = st.columns(3)
-        if btn_c1.button("1P, 1V", use_container_width=True):
-            st.session_state.p_val = 1.0
-            st.session_state.v_val = 1.0
-        if btn_c2.button("2P, 1V", use_container_width=True):
-            st.session_state.p_val = 2.0
-            st.session_state.v_val = 1.0
-        if btn_c3.button("1P, 2V", use_container_width=True):
-            st.session_state.p_val = 1.0
-            st.session_state.v_val = 2.0
+        b1, b2, b3 = st.columns(3)
+        if b1.button("1P, 1V", use_container_width=True):
+            st.session_state.p_val, st.session_state.v_val = 1.0, 1.0
+        if b2.button("2P, 1V", use_container_width=True):
+            st.session_state.p_val, st.session_state.v_val = 2.0, 1.0
+        if b3.button("1P, 2V", use_container_width=True):
+            st.session_state.p_val, st.session_state.v_val = 1.0, 2.0
 
     with ctrl_col1:
-        P_ratio = st.slider(
-            "🔹 連續調整【實驗組】氣體分壓 (P 倍數)",
-            min_value=0.5, max_value=3.0, step=0.1, key="p_val"
-        )
-
+        P_ratio = st.slider("🔹 連續調整【實驗組】氣體分壓 (P 倍數)",
+                            min_value=0.5, max_value=3.0, step=0.1, key="p_val")
     with ctrl_col2:
-        V_solv_ratio = st.slider(
-            "💧 連續調整【實驗組】溶劑體積 (V劑 倍數)",
-            min_value=0.5, max_value=2.5, step=0.1, key="v_val"
-        )
-
+        V_solv_ratio = st.slider("💧 連續調整【實驗組】溶劑體積 (V劑 倍數)",
+                                 min_value=0.5, max_value=2.5, step=0.1, key="v_val")
     with ctrl_col4:
         st.markdown("**🛠️ 教學輔助設定**")
         quiz_mode = st.checkbox("🔒 遮蔽變化結論 (提問模式)", value=False)
-        anim_speed = st.slider(
-            "粒子移動速度", min_value=0.0, max_value=3.0,
-            value=1.2, step=0.2, label_visibility="collapsed"
-        )
+        anim_speed = st.slider("粒子移動速度", 0.0, 3.0, 1.2, 0.2, label_visibility="collapsed")
 
-# ================= 物理量倍數計算 =================
 s_ratio = P_ratio
 n_ratio = s_ratio * V_solv_ratio
 w_ratio = n_ratio
 dv_ratio = n_ratio / P_ratio
 
-# ================= 動態粒子與並列容器 Canvas 渲染 =================
 def render_dual_canvas(P_exp, V_exp, dV_exp, speed):
     html_code = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <meta charset="utf-8">
-    <style>
-        body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Microsoft JhengHei', 'PingFang TC', sans-serif; }}
-        #canvas-wrap {{
-            width: 100%;
-            background: #ffffff;
-            border: 2px solid #dcdcdc;
-            border-radius: 12px;
-            box-sizing: border-box;
-            overflow: hidden;
-        }}
-        canvas {{ width: 100%; height: auto; display: block; }}
-    </style>
-    </head>
-    <body>
-    <div id="canvas-wrap">
-        <canvas id="simCanvas"></canvas>
-    </div>
-    <script>
-        const canvas = document.getElementById('simCanvas');
-        const ctx = canvas.getContext('2d');
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+body{{margin:0;background:transparent;font-family:'Microsoft JhengHei','PingFang TC',sans-serif}}
+#canvas-wrap{{width:100%;background:#fff;border:2px solid #dcdcdc;border-radius:12px;box-sizing:border-box;overflow:hidden}}
+canvas{{width:100%;height:auto;display:block}}
+</style></head><body><div id="canvas-wrap"><canvas id="simCanvas"></canvas></div>
+<script>
+const canvas=document.getElementById('simCanvas'),ctx=canvas.getContext('2d');
+const W=1400,H=540,dpr=window.devicePixelRatio||1;
+canvas.width=W*dpr;canvas.height=H*dpr;ctx.scale(dpr,dpr);
+const P_EXP={P_exp},V_EXP={V_exp},DV_EXP={dV_exp},SPEED={speed};
+const BOTTOM=495,TOP=75,CW=200,PH=18,LIQH=65,GASH=115,DVH=48;
+function createParticles(n,x1,x2,y1,y2,phase){{
+ const a=[],r=5;
+ for(let i=0;i<n;i++){{
+  const ang=Math.random()*Math.PI*2,v=(1.1+Math.random()*1.1)*(phase==='liq'?0.7:1);
+  a.push({{x:x1+r+Math.random()*(x2-x1-2*r),y:y1+r+Math.random()*(y2-y1-2*r),
+   vx:Math.cos(ang)*v,vy:Math.sin(ang)*v,r,xMin:x1,xMax:x2,yMin:y1,yMax:y2}});
+ }}return a;
+}}
+function buildGroup(off,p,v,dv,title,color){{
+ const hL=LIQH*v,yL=BOTTOM-hL,yEq=yL-GASH,hD=DVH*dv,yInit=yEq-hD,x1=off+55,x2=off+385;
+ const nl=Math.max(2,Math.round(5*p*v)),ng=Math.max(3,Math.round(10*p));
+ return {{off,p,v,dv,title,color,x1,x2,hL,yL,yEq,hD,yInit,
+ init:createParticles(ng+nl,x1,x1+CW,yInit+PH,yL,'gas'),
+ gas:createParticles(ng,x2,x2+CW,yEq+PH,yL,'gas'),
+ liq:createParticles(nl,x2,x2+CW,yL,BOTTOM,'liq')}};
+}}
+const base=buildGroup(15,1,1,1,"【基準對照組】 1.0 P atm、1.0 V劑","#2b579a");
+const exp=buildGroup(715,P_EXP,V_EXP,DV_EXP,`【實驗調整組】 ${{P_EXP.toFixed(1)}} P atm、${{V_EXP.toFixed(1)}} V劑`,"#b02a37");
+function arrow(x1,y1,x2,y2,c="#000",lw=2){{
+ const h=9,a=Math.atan2(y2-y1,x2-x1);ctx.strokeStyle=c;ctx.fillStyle=c;ctx.lineWidth=lw;
+ ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+ ctx.beginPath();ctx.moveTo(x2,y2);ctx.lineTo(x2-h*Math.cos(a-Math.PI/6),y2-h*Math.sin(a-Math.PI/6));
+ ctx.lineTo(x2-h*Math.cos(a+Math.PI/6),y2-h*Math.sin(a+Math.PI/6));ctx.closePath();ctx.fill();
+}}
+function doubleArrow(x,y1,y2,c){{arrow(x,(y1+y2)/2,x,y1,c,2);arrow(x,(y1+y2)/2,x,y2,c,2)}}
 
-        const LOGICAL_W = 1400;
-        const LOGICAL_H = 540;
-        const dpr = window.devicePixelRatio || 1;
-        canvas.width = LOGICAL_W * dpr;
-        canvas.height = LOGICAL_H * dpr;
-        ctx.scale(dpr, dpr);
-
-        const P_EXP = {P_exp};
-        const V_EXP = {V_exp};
-        const DV_EXP = {dV_exp};
-        const SPEED = {speed};
-
-        const CYL_BOTTOM = 495;
-        const CYL_TOP = 75;
-        const CYL_W = 200;
-        const PISTON_H = 18;
-        const BASE_LIQ_H = 65;
-        const GAS_EQ_H = 115;
-        const BASE_DV_H = 48;
-
-        function createParticles(count, xMin, xMax, yMin, yMax, isLiquid) {{
-            const arr = [];
-            const r = 5;
-            const spdMult = isLiquid ? 0.55 : 1.0;
-
-            for (let i = 0; i < count; i++) {{
-                const angle = Math.random() * Math.PI * 2;
-                const v = (1.2 + Math.random() * 1.0) * spdMult;
-
-                arr.push({{
-                    x: xMin + r + 2 + Math.random() * Math.max(1, (xMax - xMin - 2 * r - 4)),
-                    y: yMin + r + 2 + Math.random() * Math.max(1, (yMax - yMin - 2 * r - 4)),
-                    vx: Math.cos(angle) * v,
-                    vy: Math.sin(angle) * v,
-                    r: r,
-                    xMin: xMin, xMax: xMax,
-                    yMin: yMin, yMax: yMax
-                }});
-            }}
-            return arr;
-        }}
-
-        function buildGroup(offsetX, pMult, vMult, dvMult, titleText, themeColor) {{
-            const hLiq = BASE_LIQ_H * vMult;
-            const yLiqTop = CYL_BOTTOM - hLiq;
-            const yPistonEq = yLiqTop - GAS_EQ_H;
-            const hDv = BASE_DV_H * dvMult;
-            const yPistonInit = yPistonEq - hDv;
-
-            const x1 = offsetX + 55;
-            const x2 = offsetX + 385;
-
-            const nLiqEq = Math.max(1, Math.round(5 * pMult * vMult));
-            const nGasEq = Math.max(1, Math.round(10 * pMult));
-            const nGasInit = nGasEq + nLiqEq;
-
-            const pInitGas = createParticles(nGasInit, x1, x1 + CYL_W, yPistonInit + PISTON_H, yLiqTop, false);
-            const pEqGas = createParticles(nGasEq, x2, x2 + CYL_W, yPistonEq + PISTON_H, yLiqTop, false);
-            const pEqLiq = createParticles(nLiqEq, x2, x2 + CYL_W, yLiqTop, CYL_BOTTOM, true);
-
-            return {{
-                offsetX, titleText, themeColor,
-                pMult, vMult, dvMult,
-                x1, x2, hLiq, yLiqTop, yPistonEq, hDv, yPistonInit,
-                pInitGas, pEqGas, pEqLiq
-            }};
-        }}
-
-        const baseGroup = buildGroup(15, 1.0, 1.0, 1.0, "【基準對照組】 1.0 P atm 、 1.0 V劑", "#2b579a");
-        const expGroup = buildGroup(715, P_EXP, V_EXP, DV_EXP, `【實驗調整組】 ${{P_EXP.toFixed(1)}} P atm 、 ${{V_EXP.toFixed(1)}} V劑`, "#b02a37");
-
-        function drawArrow(x1, y1, x2, y2, color="#000", lineWidth=2.2) {{
-            const headlen = 9;
-            const dx = x2 - x1;
-            const dy = y2 - y1;
-            const angle = Math.atan2(dy, dx);
-
-            ctx.strokeStyle = color;
-            ctx.fillStyle = color;
-            ctx.lineWidth = lineWidth;
-            ctx.beginPath();
-            ctx.moveTo(x1, y1);
-            ctx.lineTo(x2, y2);
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.moveTo(x2, y2);
-            ctx.lineTo(x2 - headlen * Math.cos(angle - Math.PI / 6), y2 - headlen * Math.sin(angle - Math.PI / 6));
-            ctx.lineTo(x2 - headlen * Math.cos(angle + Math.PI / 6), y2 - headlen * Math.sin(angle + Math.PI / 6));
-            ctx.closePath();
-            ctx.fill();
-        }}
-
-        function drawDoubleArrow(x, y1, y2, color="#d9534f") {{
-            drawArrow(x, (y1 + y2) / 2, x, y1, color, 2);
-            drawArrow(x, (y1 + y2) / 2, x, y2, color, 2);
-        }}
-
-        function updateAndDrawParticles(particles) {{
-            ctx.fillStyle = "#111111";
-
-            for (let p of particles) {{
-                p.x += p.vx * SPEED;
-                p.y += p.vy * SPEED;
-
-                if (p.x - p.r < p.xMin + 2) {{ p.x = p.xMin + p.r + 2; p.vx *= -1; }}
-                if (p.x + p.r > p.xMax - 2) {{ p.x = p.xMax - p.r - 2; p.vx *= -1; }}
-                if (p.y - p.r < p.yMin + 2) {{ p.y = p.yMin + p.r + 2; p.vy *= -1; }}
-                if (p.y + p.r > p.yMax - 2) {{ p.y = p.yMax - p.r - 2; p.vy *= -1; }}
-
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-                ctx.fill();
-            }}
-        }}
-
-        function drawGroup(g) {{
-            const pText = g.pMult === 1.0 ? "P atm" : `${{Number(g.pMult.toFixed(1))}}P atm`;
-            const vText = g.vMult === 1.0 ? "V劑" : `${{Number(g.vMult.toFixed(1))}}V劑`;
-
-            ctx.fillStyle = g.themeColor;
-            ctx.font = "bold 20px 'Microsoft JhengHei', sans-serif";
-            ctx.textAlign = "center";
-            ctx.fillText(g.titleText, g.offsetX + 335, 32);
-
-            ctx.fillStyle = "#555";
-            ctx.font = "bold 15px 'Microsoft JhengHei', sans-serif";
-            ctx.fillText("剛接觸瞬間 (未溶解)", g.x1 + CYL_W / 2, 60);
-            ctx.fillText("溶解達平衡狀態", g.x2 + CYL_W / 2, 60);
-
-            // 左容器：溶劑與初始活塞
-            ctx.fillStyle = "#b8daff";
-            ctx.strokeStyle = "#333";
-            ctx.lineWidth = 1.5;
-            ctx.fillRect(g.x1, g.yLiqTop, CYL_W, g.hLiq);
-            ctx.strokeRect(g.x1, g.yLiqTop, CYL_W, g.hLiq);
-
-            ctx.fillStyle = "#003366";
-            ctx.font = "bold 18px 'Microsoft JhengHei', sans-serif";
-            ctx.fillText(vText, g.x1 + CYL_W / 2, g.yLiqTop + g.hLiq / 2 + 7);
-
-            ctx.fillStyle = "#a6a6a6";
-            ctx.strokeStyle = "#222";
-            ctx.lineWidth = 2;
-            ctx.fillRect(g.x1, g.yPistonInit, CYL_W, PISTON_H);
-            ctx.strokeRect(g.x1, g.yPistonInit, CYL_W, PISTON_H);
-
-            drawArrow(g.x1 + CYL_W / 2, g.yPistonInit - 45, g.x1 + CYL_W / 2, g.yPistonInit - 2, "#000", 2.2);
-
-            ctx.fillStyle = "#000";
-            ctx.textAlign = "left";
-            ctx.font = "bold 16px 'Microsoft JhengHei', sans-serif";
-            ctx.fillText(pText, g.x1 + CYL_W / 2 + 8, g.yPistonInit - 18);
-
-            updateAndDrawParticles(g.pInitGas);
-
-            ctx.fillStyle = "#111";
-            ctx.font = "bold 16px 'Microsoft JhengHei', sans-serif";
-            ctx.textAlign = "left";
-            ctx.fillText(`PO₂=${{pText}}`, g.x1 + 12, g.yPistonInit + 42);
-            ctx.textAlign = "right";
-            ctx.fillText("V₁", g.x1 + CYL_W - 12, g.yLiqTop - 12);
-
-            ctx.strokeStyle = "#000";
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(g.x1, CYL_TOP);
-            ctx.lineTo(g.x1, CYL_BOTTOM);
-            ctx.lineTo(g.x1 + CYL_W, CYL_BOTTOM);
-            ctx.lineTo(g.x1 + CYL_W, CYL_TOP);
-            ctx.stroke();
-
-            // 中間過渡箭頭
-            ctx.fillStyle = "#000";
-            ctx.textAlign = "center";
-            ctx.font = "bold 16px 'Microsoft JhengHei', sans-serif";
-            ctx.fillText("溶解達平衡", g.x1 + CYL_W + 65, 290);
-            drawArrow(g.x1 + CYL_W + 15, 305, g.x2 - 15, 305, "#000", 2.5);
-
-            // 右容器：平衡狀態
-            ctx.fillStyle = "#b8daff";
-            ctx.strokeStyle = "#333";
-            ctx.lineWidth = 1.5;
-            ctx.fillRect(g.x2, g.yLiqTop, CYL_W, g.hLiq);
-            ctx.strokeRect(g.x2, g.yLiqTop, CYL_W, g.hLiq);
-
-            // 原活塞位置虛線
-            ctx.save();
-            ctx.setLineDash([5, 5]);
-            ctx.strokeStyle = "#666";
-            ctx.lineWidth = 1.8;
-            ctx.strokeRect(g.x2, g.yPistonInit, CYL_W, PISTON_H);
-            ctx.restore();
-
-            // 平衡活塞
-            ctx.fillStyle = "#a6a6a6";
-            ctx.strokeStyle = "#222";
-            ctx.lineWidth = 2;
-            ctx.fillRect(g.x2, g.yPistonEq, CYL_W, PISTON_H);
-            ctx.strokeRect(g.x2, g.yPistonEq, CYL_W, PISTON_H);
-
-            drawArrow(g.x2 + CYL_W / 2, g.yPistonEq - 45, g.x2 + CYL_W / 2, g.yPistonEq - 2, "#000", 2.2);
-
-            ctx.fillStyle = "#000";
-            ctx.textAlign = "left";
-            ctx.font = "bold 16px 'Microsoft JhengHei', sans-serif";
-            ctx.fillText(pText, g.x2 + CYL_W / 2 + 8, g.yPistonEq - 18);
-
-            updateAndDrawParticles(g.pEqGas);
-            updateAndDrawParticles(g.pEqLiq);
-
-            ctx.fillStyle = "#003366";
-            ctx.textAlign = "center";
-            ctx.font = "bold 18px 'Microsoft JhengHei', sans-serif";
-            ctx.fillText(vText, g.x2 + CYL_W / 2, g.yLiqTop + g.hLiq / 2 + 7);
-
-            ctx.fillStyle = "#111";
-            ctx.font = "bold 16px 'Microsoft JhengHei', sans-serif";
-            ctx.textAlign = "left";
-            ctx.fillText(`PO₂=${{pText}}`, g.x2 + 12, g.yPistonEq + 42);
-            ctx.textAlign = "right";
-            ctx.fillText("V₂", g.x2 + CYL_W - 12, g.yLiqTop - 12);
-
-            ctx.strokeStyle = "#000";
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(g.x2, CYL_TOP);
-            ctx.lineTo(g.x2, CYL_BOTTOM);
-            ctx.lineTo(g.x2 + CYL_W, CYL_BOTTOM);
-            ctx.lineTo(g.x2 + CYL_W, CYL_TOP);
-            ctx.stroke();
-
-            // ΔV 紅色雙向箭頭
-            const dvX = g.x2 + CYL_W + 22;
-            drawDoubleArrow(dvX, g.yPistonInit + PISTON_H / 2, g.yPistonEq + PISTON_H / 2, "#d9534f");
-
-            ctx.fillStyle = "#d9534f";
-            ctx.textAlign = "left";
-            ctx.font = "bold 17px 'Microsoft JhengHei', sans-serif";
-            ctx.fillText("ΔV", dvX + 8, (g.yPistonInit + g.yPistonEq + PISTON_H) / 2 + 6);
-        }}
-
-        function animate() {{
-            ctx.clearRect(0, 0, LOGICAL_W, LOGICAL_H);
-
-            ctx.save();
-            ctx.strokeStyle = "#cccccc";
-            ctx.lineWidth = 2;
-            ctx.setLineDash([8, 6]);
-            ctx.beginPath();
-            ctx.moveTo(700, 15);
-            ctx.lineTo(700, LOGICAL_H - 15);
-            ctx.stroke();
-            ctx.restore();
-
-            drawGroup(baseGroup);
-            drawGroup(expGroup);
-
-            requestAnimationFrame(animate);
-        }}
-
-        animate();
-    </script>
-    </body>
-    </html>
-    """
+// 平衡容器中：氣相與液相粒子可以跨越界面，雙向交換
+function updatePhase(g,phase){{
+ const arr=phase==='gas'?g.gas:g.liq,other=phase==='gas'?g.liq:g.gas;
+ const interfaceY=g.yL,gasBottom=g.yEq+PH,prob=Math.min(0.22,0.035*SPEED);
+ for(let i=arr.length-1;i>=0;i--){{
+  const p=arr[i];p.x+=p.vx*SPEED;p.y+=p.vy*SPEED;
+  if(p.x-p.r<p.xMin+2){{p.x=p.xMin+p.r+2;p.vx=Math.abs(p.vx)}}
+  if(p.x+p.r>p.xMax-2){{p.x=p.xMax-p.r-2;p.vx=-Math.abs(p.vx)}}
+  if(phase==='gas'){{
+   if(p.y+p.r>=interfaceY && p.vy>0){{
+    if(Math.random()<prob){{
+     arr.splice(i,1);p.y=interfaceY+p.r+1;p.yMin=interfaceY;p.yMax=BOTTOM;
+     p.vx*=0.7;p.vy=Math.max(0.45,Math.abs(p.vy)*0.7);other.push(p);continue;
+    }}else{{p.y=interfaceY-p.r-1;p.vy=-Math.abs(p.vy)}}
+   }}
+   if(p.y-p.r<gasBottom){{p.y=gasBottom+p.r;p.vy=Math.abs(p.vy)}}
+  }}else{{
+   if(p.y-p.r<=interfaceY && p.vy<0){{
+    if(Math.random()<prob){{
+     arr.splice(i,1);p.y=interfaceY-p.r-1;p.yMin=gasBottom;p.yMax=interfaceY;
+     p.vx/=0.7;p.vy=-Math.max(0.45,Math.abs(p.vy)/0.7);other.push(p);continue;
+    }}else{{p.y=interfaceY+p.r+1;p.vy=Math.abs(p.vy)}}
+   }}
+   if(p.y+p.r>BOTTOM){{p.y=BOTTOM-p.r;p.vy=-Math.abs(p.vy)}}
+  }}
+  ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle="#111";ctx.fill();
+ }}
+}}
+function drawStaticParticles(a){{
+ for(const p of a){{
+  p.x+=p.vx*SPEED;p.y+=p.vy*SPEED;
+  if(p.x-p.r<p.xMin+2||p.x+p.r>p.xMax-2)p.vx*=-1;
+  if(p.y-p.r<p.yMin+2||p.y+p.r>p.yMax-2)p.vy*=-1;
+  p.x=Math.max(p.xMin+p.r+2,Math.min(p.xMax-p.r-2,p.x));
+  p.y=Math.max(p.yMin+p.r+2,Math.min(p.yMax-p.r-2,p.y));
+  ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle="#111";ctx.fill();
+ }}
+}}
+function drawGroup(g){{
+ const pt=g.p===1?"P atm":`${{g.p.toFixed(1)}}P atm`,vt=g.v===1?"V劑":`${{g.v.toFixed(1)}}V劑`;
+ ctx.fillStyle=g.color;ctx.font="bold 20px Microsoft JhengHei";ctx.textAlign="center";ctx.fillText(g.title,g.off+335,32);
+ ctx.fillStyle="#555";ctx.font="bold 15px Microsoft JhengHei";
+ ctx.fillText("剛接觸瞬間（未溶解）",g.x1+CW/2,60);ctx.fillText("溶解達平衡狀態",g.x2+CW/2,60);
+ // 初始容器液體與活塞
+ ctx.fillStyle="#b8daff";ctx.fillRect(g.x1,g.yL,CW,g.hL);ctx.strokeStyle="#333";ctx.lineWidth=1.5;ctx.strokeRect(g.x1,g.yL,CW,g.hL);
+ ctx.fillStyle="#003366";ctx.font="bold 18px Microsoft JhengHei";ctx.fillText(vt,g.x1+CW/2,g.yL+g.hL/2+7);
+ ctx.fillStyle="#a6a6a6";ctx.fillRect(g.x1,g.yInit,CW,PH);ctx.strokeStyle="#222";ctx.lineWidth=2;ctx.strokeRect(g.x1,g.yInit,CW,PH);
+ arrow(g.x1+CW/2,g.yInit-45,g.x1+CW/2,g.yInit-2);
+ ctx.fillStyle="#000";ctx.textAlign="left";ctx.font="bold 16px Microsoft JhengHei";ctx.fillText(pt,g.x1+CW/2+8,g.yInit-18);
+ drawStaticParticles(g.init);
+ ctx.fillText(`P O₂ = ${{pt}}`,g.x1+10,g.yInit+42);ctx.textAlign="right";ctx.fillText("V₁",g.x1+CW-10,g.yL-12);
+ ctx.strokeStyle="#000";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(g.x1,TOP);ctx.lineTo(g.x1,BOTTOM);ctx.lineTo(g.x1+CW,BOTTOM);ctx.lineTo(g.x1+CW,TOP);ctx.stroke();
+ ctx.fillStyle="#000";ctx.textAlign="center";ctx.font="bold 16px Microsoft JhengHei";ctx.fillText("溶解達平衡",g.x1+CW+65,290);arrow(g.x1+CW+15,305,g.x2-15,305);
+ // 平衡容器
+ ctx.fillStyle="#b8daff";ctx.fillRect(g.x2,g.yL,CW,g.hL);ctx.strokeStyle="#333";ctx.lineWidth=1.5;ctx.strokeRect(g.x2,g.yL,CW,g.hL);
+ ctx.save();ctx.setLineDash([5,5]);ctx.strokeStyle="#666";ctx.lineWidth=1.8;ctx.strokeRect(g.x2,g.yInit,CW,PH);ctx.restore();
+ ctx.fillStyle="#a6a6a6";ctx.fillRect(g.x2,g.yEq,CW,PH);ctx.strokeStyle="#222";ctx.lineWidth=2;ctx.strokeRect(g.x2,g.yEq,CW,PH);
+ arrow(g.x2+CW/2,g.yEq-45,g.x2+CW/2,g.yEq-2);
+ ctx.fillStyle="#000";ctx.textAlign="left";ctx.font="bold 16px Microsoft JhengHei";ctx.fillText(pt,g.x2+CW/2+8,g.yEq-18);
+ ctx.fillStyle="#111";updatePhase(g,"gas");updatePhase(g,"liq");
+ ctx.fillStyle="#003366";ctx.textAlign="center";ctx.font="bold 18px Microsoft JhengHei";ctx.fillText(vt,g.x2+CW/2,g.yL+g.hL/2+7);
+ ctx.fillStyle="#111";ctx.textAlign="left";ctx.font="bold 16px Microsoft JhengHei";ctx.fillText(`P O₂ = ${{pt}}`,g.x2+10,g.yEq+42);
+ ctx.textAlign="right";ctx.fillText("V₂",g.x2+CW-10,g.yL-12);
+ ctx.strokeStyle="#000";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(g.x2,TOP);ctx.lineTo(g.x2,BOTTOM);ctx.lineTo(g.x2+CW,BOTTOM);ctx.lineTo(g.x2+CW,TOP);ctx.stroke();
+ const dx=g.x2+CW+22;doubleArrow(dx,g.yInit+PH/2,g.yEq+PH/2,"#d9534f");
+ ctx.fillStyle="#d9534f";ctx.textAlign="left";ctx.font="bold 17px Microsoft JhengHei";ctx.fillText("ΔV",dx+8,(g.yInit+g.yEq+PH)/2+6);
+}}
+function animate(){{
+ ctx.clearRect(0,0,W,H);ctx.save();ctx.strokeStyle="#ccc";ctx.lineWidth=2;ctx.setLineDash([8,6]);ctx.beginPath();ctx.moveTo(700,15);ctx.lineTo(700,H-15);ctx.stroke();ctx.restore();
+ drawGroup(base);drawGroup(exp);requestAnimationFrame(animate);
+}}
+animate();
+</script></body></html>
+"""
     return html_code
 
+components.html(render_dual_canvas(P_ratio, V_solv_ratio, dv_ratio, anim_speed), height=555, scrolling=False)
 
-components.html(
-    render_dual_canvas(P_ratio, V_solv_ratio, dv_ratio, anim_speed),
-    height=555,
-    scrolling=False
-)
-
-# ================= 下方公式區 =================
 def badge_text(mult, is_quiz):
     if is_quiz:
         return ":orange[**[ 課堂提問遮蔽 ]**]"
     if abs(mult - 1.0) < 1e-4:
         return ":blue[**不變 (1.0 倍)**]"
     return f":red[**變為 {mult:.1f} 倍**]"
-
 
 def mult_tag(mult, is_quiz):
     if is_quiz:
@@ -380,89 +180,46 @@ def mult_tag(mult, is_quiz):
         return "1"
     return f"{mult:g}"
 
+# 定量關係：左右兩欄使用相同卡片結構與順序
+col_base, col_exp = st.columns(2, gap="medium")
 
-col_base_math, col_exp_math = st.columns(2)
-
-# 左欄：基準組
-with col_base_math:
-    st.markdown(r"#### 📘 【基準對照組】定量關係 ($1.0P\text{ atm}$, $1.0V_{\text{劑}}$)")
-
+with col_base:
+    st.markdown(r"#### 📘【基準對照組】定量關係（1.0 P atm、1.0 V劑）")
     with st.container(border=True):
-        st.markdown(r"**1. $V_1 - V_2 = \text{溶解氣體體積 }(\Delta V)$**")
-        st.latex(r"P_{\text{O}_2} \Delta V = n_{\text{O}_2} R T")
-        st.markdown(r"基準狀態： $\Delta V = 1.0\text{ 倍}$")
-
+        st.markdown(r"**1. $V_1-V_2=\text{溶解氣體體積 }(\Delta V)$**")
+        st.latex(r"P_{\text{O}_2}\Delta V=n_{\text{O}_2}RT")
+        st.markdown(r"基準狀態： $\Delta V=1.0\text{ 倍}$")
     with st.container(border=True):
         st.markdown(r"**2. 此時水中 $C_{M(\text{O}_2)}$ 即為 $\text{O}_2$ 之溶解度 $s$**")
-        st.latex(r"s = K_{\text{H}} \times P_{\text{O}_2}")
-        st.markdown(r"基準狀態： $s = 1.0\text{ 倍}$")
-
+        st.latex(r"s=K_{\text{H}}\times P_{\text{O}_2}")
+        st.markdown(r"基準狀態： $s=1.0\text{ 倍}$")
     with st.container(border=True):
         st.markdown(r"**3. 溶解氣體莫耳數 ($n_{\text{O}_2}$)**")
-        st.latex(r"n_{\text{O}_2} = s \times V_{\text{劑}} = K_{\text{H}} \times P_{\text{O}_2} \times V_{\text{劑}}")
-        st.markdown(r"基準狀態： $n_{\text{O}_2} = 1.0\text{ 倍}$")
-
+        st.latex(r"n_{\text{O}_2}=s\times V_{\text{劑}}=K_{\text{H}}\times P_{\text{O}_2}\times V_{\text{劑}}")
+        st.markdown(r"基準狀態： $n_{\text{O}_2}=1.0\text{ 倍}$")
     with st.container(border=True):
         st.markdown(r"**4. 溶解氣體質量 ($W_{\text{O}_2}$)**")
-        st.latex(r"W_{\text{O}_2} = n_{\text{O}_2} \times M_{\text{O}_2} = K_{\text{H}} \times P_{\text{O}_2} \times V_{\text{劑}} \times M_{\text{O}_2}")
-        st.markdown(r"基準狀態： $W_{\text{O}_2} = 1.0\text{ 倍}$")
+        st.latex(r"W_{\text{O}_2}=n_{\text{O}_2}\times M_{\text{O}_2}=K_{\text{H}}\times P_{\text{O}_2}\times V_{\text{劑}}\times M_{\text{O}_2}")
+        st.markdown(r"基準狀態： $W_{\text{O}_2}=1.0\text{ 倍}$")
 
-# 右欄：實驗組
-with col_exp_math:
-    st.markdown(
-        rf"#### 📕 【實驗調整組】定量關係 (${P_ratio:.1f}P\text{{ atm}}$, ${V_solv_ratio:.1f}V_{{\text{{劑}}}}$)"
-    )
-
-    p_str = mult_tag(P_ratio, quiz_mode)
-    v_str = mult_tag(V_solv_ratio, quiz_mode)
-    n_str = mult_tag(n_ratio, quiz_mode)
-    dv_str = mult_tag(dv_ratio, quiz_mode)
-    s_str = mult_tag(s_ratio, quiz_mode)
-    w_str = mult_tag(w_ratio, quiz_mode)
-
+with col_exp:
+    st.markdown(rf"#### 📕【實驗調整組】定量關係（{P_ratio:.1f} P atm、{V_solv_ratio:.1f} V劑）")
+    p_str, v_str = mult_tag(P_ratio, quiz_mode), mult_tag(V_solv_ratio, quiz_mode)
+    n_str, dv_str = mult_tag(n_ratio, quiz_mode), mult_tag(dv_ratio, quiz_mode)
+    s_str, w_str = mult_tag(s_ratio, quiz_mode), mult_tag(w_ratio, quiz_mode)
     with st.container(border=True):
-        st.markdown(r"**1. $V_1 - V_2 = \text{溶解氣體體積 }(\Delta V)$**")
-        st.latex(
-            rf"\underbrace{{P_{{\text{{O}}_2}}}}_{{\times {p_str}}} \cdot "
-            rf"\underbrace{{\Delta V}}_{{\times {dv_str}}} = "
-            rf"\underbrace{{n_{{\text{{O}}_2}}}}_{{\times {n_str}}} R T"
-        )
-        st.markdown(
-            rf"👉 溶解氣體體積 ($\Delta V$)：{badge_text(dv_ratio, quiz_mode)}"
-        )
-
+        st.markdown(r"**1. $V_1-V_2=\text{溶解氣體體積 }(\Delta V)$**")
+        st.latex(rf"\underbrace{{P_{{\text{{O}}_2}}}}_{{\times {p_str}}}\cdot\underbrace{{\Delta V}}_{{\times {dv_str}}}=\underbrace{{n_{{\text{{O}}_2}}}}_{{\times {n_str}}}RT")
+        st.markdown(rf"👉 溶解氣體體積 ($\Delta V$)：{badge_text(dv_ratio, quiz_mode)}")
     with st.container(border=True):
         st.markdown(r"**2. 此時水中 $C_{M(\text{O}_2)}$ 即為 $\text{O}_2$ 之溶解度 $s$**")
-        st.latex(
-            rf"\underbrace{{s}}_{{\times {s_str}}} = "
-            rf"\underbrace{{K_{{\text{{H}}}}}}_{{\text{{定溫不變}}}} \times "
-            rf"\underbrace{{P_{{\text{{O}}_2}}}}_{{\times {p_str}}}"
-        )
-        st.markdown(
-            rf"👉 氣體溶解度 ($s$)：{badge_text(s_ratio, quiz_mode)}"
-        )
-
+        st.latex(rf"\underbrace{{s}}_{{\times {s_str}}}= \underbrace{{K_{{\text{{H}}}}}}_{{\text{{定溫不變}}}}\times\underbrace{{P_{{\text{{O}}_2}}}}_{{\times {p_str}}}")
+        st.markdown(rf"👉 氣體溶解度 ($s$)：{badge_text(s_ratio, quiz_mode)}")
     with st.container(border=True):
         st.markdown(r"**3. 溶解氣體莫耳數 ($n_{\text{O}_2}$)**")
-        st.latex(
-            rf"\underbrace{{n_{{\text{{O}}_2}}}}_{{\times {n_str}}} = "
-            rf"K_{{\text{{H}}}} \times "
-            rf"\underbrace{{P_{{\text{{O}}_2}}}}_{{\times {p_str}}} \times "
-            rf"\underbrace{{V_{{\text{{劑}}}}}}_{{\times {v_str}}}"
-        )
-        st.markdown(
-            rf"👉 溶解莫耳數 ($n_{{\text{{O}}_2}}$)：{badge_text(n_ratio, quiz_mode)}"
-        )
-
+        st.latex(rf"\underbrace{{n_{{\text{{O}}_2}}}}_{{\times {n_str}}}=K_{{\text{{H}}}}\times\underbrace{{P_{{\text{{O}}_2}}}}_{{\times {p_str}}}\times\underbrace{{V_{{\text{{劑}}}}}}_{{\times {v_str}}}")
+        st.markdown(rf"👉 溶解莫耳數 ($n_{{\text{{O}}_2}}$)：{badge_text(n_ratio, quiz_mode)}")
     with st.container(border=True):
         st.markdown(r"**4. 溶解氣體質量 ($W_{\text{O}_2}$)**")
-        st.latex(
-            rf"\underbrace{{W_{{\text{{O}}_2}}}}_{{\times {w_str}}} = "
-            rf"K_{{\text{{H}}}} \times "
-            rf"\underbrace{{P_{{\text{{O}}_2}}}}_{{\times {p_str}}} \times "
-            rf"\underbrace{{V_{{\text{{劑}}}}}}_{{\times {v_str}}} \times "
-            rf"\underbrace{{M_{{\text{{O}}_2}}}}_{{\text{{分子量不變}}}}"
-        )
-        st.markdown(
-            rf"👉 溶解氣體質量 ($W_{{\text{{O}}_2}}$)：{badge_text(w_ratio, quiz_mode)}"
-        )
+        st.latex(rf"\underbrace{{W_{{\text{{O}}_2}}}}_{{\times {w_str}}}=K_{{\text{{H}}}}\times\underbrace{{P_{{\text{{O}}_2}}}}_{{\times {p_str}}}\times\underbrace{{V_{{\text{{劑}}}}}}_{{\times {v_str}}}\times\underbrace{{M_{{\text{{O}}_2}}}}_{{\text{{分子量不變}}}}")
+        st.markdown(rf"👉 溶解氣體質量 ($W_{{\text{{O}}_2}}$)：{badge_text(w_ratio, quiz_mode)}")
