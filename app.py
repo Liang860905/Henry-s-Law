@@ -52,10 +52,10 @@ with st.container(border=True):
             st.session_state.p_val, st.session_state.v_val = 1.0, 2.0
 
     with ctrl_col1:
-        P_ratio = st.slider("🔹 【實驗組】氣體分壓 (P 倍數)",
+        P_ratio = st.slider("🔹 連續調整【實驗組】氣體分壓 (P 倍數)",
                             min_value=0.5, max_value=3.0, step=0.1, key="p_val")
     with ctrl_col2:
-        V_solv_ratio = st.slider("💧 【實驗組】溶劑體積 (V劑 倍數)",
+        V_solv_ratio = st.slider("💧 連續調整【實驗組】溶劑體積 (V劑 倍數)",
                                  min_value=0.5, max_value=2.5, step=0.1, key="v_val")
     with ctrl_col4:
         st.markdown("**🛠️ 教學輔助設定**")
@@ -90,7 +90,10 @@ function createParticles(n,x1,x2,y1,y2,phase){{
  }}return a;
 }}
 function buildGroup(off,p,v,dv,title,color){{
- const hL=LIQH*v,yL=BOTTOM-hL,yEq=yL-GASH,hD=DVH*dv,yInit=yEq-hD,x1=off+55,x2=off+385;
+ const hL=LIQH*v,yL=BOTTOM-hL,hD=DVH*dv;
+ // 初始氣體體積固定：初始活塞與液面保持固定距離。
+ // 溶解平衡後，活塞依 ΔV 向下移動；溶劑體積改變不會改變初始氣體體積。
+ const yInit=yL-GASH-BASE_DVH,yEq=yInit+hD,x1=off+55,x2=off+385;
  const nl=Math.max(2,Math.round(5*p*v)),ng=Math.max(3,Math.round(10*p));
  return {{off,p,v,dv,title,color,x1,x2,hL,yL,yEq,hD,yInit,
  init:createParticles(ng+nl,x1,x1+CW,yInit+PH,yL,'gas'),
