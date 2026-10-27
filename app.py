@@ -69,124 +69,227 @@ dv_ratio = n_ratio / P_ratio
 
 def render_dual_canvas(P_exp, V_exp, dV_exp, speed):
     html_code = f"""
-<!DOCTYPE html><html><head><meta charset="utf-8">
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
 <style>
-body{{margin:0;background:transparent;font-family:'Microsoft JhengHei','PingFang TC',sans-serif}}
-#canvas-wrap{{width:100%;background:#fff;border:2px solid #dcdcdc;border-radius:12px;box-sizing:border-box;overflow:hidden}}
-canvas{{width:100%;height:auto;display:block}}
-</style></head><body><div id="canvas-wrap"><canvas id="simCanvas"></canvas></div>
+body {{
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    font-family: 'Microsoft JhengHei', 'PingFang TC', sans-serif;
+}}
+#canvas-wrap {{
+    width: 100%;
+    height: 550px;
+    background: #fff;
+    border: 2px solid #dcdcdc;
+    border-radius: 12px;
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}}
+canvas {{
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    display: block;
+}}
+</style>
+</head>
+<body>
+<div id="canvas-wrap"><canvas id="simCanvas"></canvas></div>
 <script>
-const canvas=document.getElementById('simCanvas'),ctx=canvas.getContext('2d');
-const W=1400,H=540,dpr=window.devicePixelRatio||1;
-canvas.width=W*dpr;canvas.height=H*dpr;ctx.scale(dpr,dpr);
-const P_EXP={P_exp},V_EXP={V_exp},DV_EXP={dV_exp},SPEED={speed};
-const BOTTOM=495,TOP=75,CW=200,PH=18,LIQH=65,GASH=115,DVH=48;
-function createParticles(n,x1,x2,y1,y2,phase){{
- const a=[],r=5;
- for(let i=0;i<n;i++){{
-  const ang=Math.random()*Math.PI*2,v=(1.1+Math.random()*1.1)*(phase==='liq'?0.7:1);
-  a.push({{x:x1+r+Math.random()*(x2-x1-2*r),y:y1+r+Math.random()*(y2-y1-2*r),
-   vx:Math.cos(ang)*v,vy:Math.sin(ang)*v,r,xMin:x1,xMax:x2,yMin:y1,yMax:y2}});
- }}return a;
-}}
-function buildGroup(off,p,v,dv,title,color){{
- const hL=LIQH*v,yL=BOTTOM-hL,hD=DVH*dv;
- // 初始氣體體積固定：初始活塞與液面保持固定距離。
- // 溶解平衡後，活塞依 ΔV 向下移動；溶劑體積改變不會改變初始氣體體積。
- const yInit=yL-GASH-DVH,yEq=yInit+hD,x1=off+55,x2=off+385;
- const nl=Math.max(2,Math.round(5*p*v)),ng=Math.max(3,Math.round(10*p));
- return {{off,p,v,dv,title,color,x1,x2,hL,yL,yEq,hD,yInit,
- init:createParticles(ng+nl,x1,x1+CW,yInit+PH,yL,'gas'),
- gas:createParticles(ng,x2,x2+CW,yEq+PH,yL,'gas'),
- liq:createParticles(nl,x2,x2+CW,yL,BOTTOM,'liq')}};
-}}
-const base=buildGroup(15,1,1,1,"【基準對照組】 1.0 P atm、1.0 V劑","#2b579a");
-const exp=buildGroup(715,P_EXP,V_EXP,DV_EXP,`【實驗調整組】 ${{P_EXP.toFixed(1)}} P atm、${{V_EXP.toFixed(1)}} V劑`,"#b02a37");
-function arrow(x1,y1,x2,y2,c="#000",lw=2){{
- const h=9,a=Math.atan2(y2-y1,x2-x1);ctx.strokeStyle=c;ctx.fillStyle=c;ctx.lineWidth=lw;
- ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
- ctx.beginPath();ctx.moveTo(x2,y2);ctx.lineTo(x2-h*Math.cos(a-Math.PI/6),y2-h*Math.sin(a-Math.PI/6));
- ctx.lineTo(x2-h*Math.cos(a+Math.PI/6),y2-h*Math.sin(a+Math.PI/6));ctx.closePath();ctx.fill();
-}}
-function doubleArrow(x,y1,y2,c){{arrow(x,(y1+y2)/2,x,y1,c,2);arrow(x,(y1+y2)/2,x,y2,c,2)}}
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d');
+const W = 1400, H = 540;
+const dpr = window.devicePixelRatio || 1;
+canvas.width = W * dpr;
+canvas.height = H * dpr;
+canvas.style.aspectRatio = W + " / " + H;
+ctx.scale(dpr, dpr);
 
-// 平衡容器中：氣相與液相粒子可以跨越界面，雙向交換
-function updatePhase(g,phase){{
- const arr=phase==='gas'?g.gas:g.liq,other=phase==='gas'?g.liq:g.gas;
- const interfaceY=g.yL,gasBottom=g.yEq+PH,prob=Math.min(0.22,0.035*SPEED);
- for(let i=arr.length-1;i>=0;i--){{
-  const p=arr[i];p.x+=p.vx*SPEED;p.y+=p.vy*SPEED;
-  if(p.x-p.r<p.xMin+2){{p.x=p.xMin+p.r+2;p.vx=Math.abs(p.vx)}}
-  if(p.x+p.r>p.xMax-2){{p.x=p.xMax-p.r-2;p.vx=-Math.abs(p.vx)}}
-  if(phase==='gas'){{
-   if(p.y+p.r>=interfaceY && p.vy>0){{
-    if(Math.random()<prob){{
-     arr.splice(i,1);p.y=interfaceY+p.r+1;p.yMin=interfaceY;p.yMax=BOTTOM;
-     p.vx*=0.7;p.vy=Math.max(0.45,Math.abs(p.vy)*0.7);other.push(p);continue;
-    }}else{{p.y=interfaceY-p.r-1;p.vy=-Math.abs(p.vy)}}
-   }}
-   if(p.y-p.r<gasBottom){{p.y=gasBottom+p.r;p.vy=Math.abs(p.vy)}}
-  }}else{{
-   if(p.y-p.r<=interfaceY && p.vy<0){{
-    if(Math.random()<prob){{
-     arr.splice(i,1);p.y=interfaceY-p.r-1;p.yMin=gasBottom;p.yMax=interfaceY;
-     p.vx/=0.7;p.vy=-Math.max(0.45,Math.abs(p.vy)/0.7);other.push(p);continue;
-    }}else{{p.y=interfaceY+p.r+1;p.vy=Math.abs(p.vy)}}
-   }}
-   if(p.y+p.r>BOTTOM){{p.y=BOTTOM-p.r;p.vy=-Math.abs(p.vy)}}
-  }}
-  ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle="#111";ctx.fill();
- }}
+const P_EXP = {P_exp}, V_EXP = {V_exp}, DV_EXP = {dV_exp}, SPEED = {speed};
+const BOTTOM = 495, TOP = 75, CW = 200, PH = 18, LIQH = 65, GASH = 115, DVH = 48;
+
+function createParticles(n, x1, x2, y1, y2, phase) {{
+    const a = [], r = 5;
+    for (let i = 0; i < n; i++) {{
+        const ang = Math.random() * Math.PI * 2;
+        const v = (1.1 + Math.random() * 1.1) * (phase === 'liq' ? 0.7 : 1);
+        a.push({{
+            x: x1 + r + Math.random() * (x2 - x1 - 2 * r),
+            y: y1 + r + Math.random() * (y2 - y1 - 2 * r),
+            vx: Math.cos(ang) * v,
+            vy: Math.sin(ang) * v,
+            r: r,
+            xMin: x1, xMax: x2, yMin: y1, yMax: y2
+        }});
+    }}
+    return a;
 }}
-function drawStaticParticles(a){{
- for(const p of a){{
-  p.x+=p.vx*SPEED;p.y+=p.vy*SPEED;
-  if(p.x-p.r<p.xMin+2||p.x+p.r>p.xMax-2)p.vx*=-1;
-  if(p.y-p.r<p.yMin+2||p.y+p.r>p.yMax-2)p.vy*=-1;
-  p.x=Math.max(p.xMin+p.r+2,Math.min(p.xMax-p.r-2,p.x));
-  p.y=Math.max(p.yMin+p.r+2,Math.min(p.yMax-p.r-2,p.y));
-  ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle="#111";ctx.fill();
- }}
+
+function buildGroup(off, p, v, dv, title, color) {{
+    const hL = LIQH * v;
+    const yL = BOTTOM - hL;
+    const hD = DVH * dv;
+    const yInit = yL - GASH - DVH;
+    const yEq = yInit + hD;
+    const x1 = off + 55;
+    const x2 = off + 385;
+    const nl = Math.max(2, Math.round(5 * p * v));
+    const ng = Math.max(3, Math.round(10 * p));
+    return {{
+        off, p, v, dv, title, color, x1, x2, hL, yL, yEq, hD, yInit,
+        init: createParticles(ng + nl, x1, x1 + CW, yInit + PH, yL, 'gas'),
+        gas: createParticles(ng, x2, x2 + CW, yEq + PH, yL, 'gas'),
+        liq: createParticles(nl, x2, x2 + CW, yL, BOTTOM, 'liq')
+    }};
 }}
-function drawGroup(g){{
- const pt=g.p===1?"P atm":`${{g.p.toFixed(1)}}P atm`,vt=g.v===1?"V劑":`${{g.v.toFixed(1)}}V劑`;
- ctx.fillStyle=g.color;ctx.font="bold 20px Microsoft JhengHei";ctx.textAlign="center";ctx.fillText(g.title,g.off+335,32);
- ctx.fillStyle="#555";ctx.font="bold 15px Microsoft JhengHei";
- ctx.fillText("剛接觸瞬間（未溶解）",g.x1+CW/2,60);ctx.fillText("溶解達平衡狀態",g.x2+CW/2,60);
- // 初始容器液體與活塞
- ctx.fillStyle="#b8daff";ctx.fillRect(g.x1,g.yL,CW,g.hL);ctx.strokeStyle="#333";ctx.lineWidth=1.5;ctx.strokeRect(g.x1,g.yL,CW,g.hL);
- ctx.fillStyle="#003366";ctx.font="bold 18px Microsoft JhengHei";ctx.fillText(vt,g.x1+CW/2,g.yL+g.hL/2+7);
- ctx.fillStyle="#a6a6a6";ctx.fillRect(g.x1,g.yInit,CW,PH);ctx.strokeStyle="#222";ctx.lineWidth=2;ctx.strokeRect(g.x1,g.yInit,CW,PH);
- arrow(g.x1+CW/2,g.yInit-45,g.x1+CW/2,g.yInit-2);
- ctx.fillStyle="#000";ctx.textAlign="left";ctx.font="bold 16px Microsoft JhengHei";ctx.fillText(pt,g.x1+CW/2+8,g.yInit-18);
- drawStaticParticles(g.init);
- ctx.fillText(`P O₂ = ${{pt}}`,g.x1+10,g.yInit+42);ctx.textAlign="right";ctx.fillText("V₁",g.x1+CW-10,g.yL-12);
- ctx.strokeStyle="#000";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(g.x1,TOP);ctx.lineTo(g.x1,BOTTOM);ctx.lineTo(g.x1+CW,BOTTOM);ctx.lineTo(g.x1+CW,TOP);ctx.stroke();
- ctx.fillStyle="#000";ctx.textAlign="center";ctx.font="bold 16px Microsoft JhengHei";ctx.fillText("溶解達平衡",g.x1+CW+65,290);arrow(g.x1+CW+15,305,g.x2-15,305);
- // 平衡容器
- ctx.fillStyle="#b8daff";ctx.fillRect(g.x2,g.yL,CW,g.hL);ctx.strokeStyle="#333";ctx.lineWidth=1.5;ctx.strokeRect(g.x2,g.yL,CW,g.hL);
- ctx.save();ctx.setLineDash([5,5]);ctx.strokeStyle="#666";ctx.lineWidth=1.8;ctx.strokeRect(g.x2,g.yInit,CW,PH);ctx.restore();
- ctx.fillStyle="#a6a6a6";ctx.fillRect(g.x2,g.yEq,CW,PH);ctx.strokeStyle="#222";ctx.lineWidth=2;ctx.strokeRect(g.x2,g.yEq,CW,PH);
- arrow(g.x2+CW/2,g.yEq-45,g.x2+CW/2,g.yEq-2);
- ctx.fillStyle="#000";ctx.textAlign="left";ctx.font="bold 16px Microsoft JhengHei";ctx.fillText(pt,g.x2+CW/2+8,g.yEq-18);
- ctx.fillStyle="#111";updatePhase(g,"gas");updatePhase(g,"liq");
- ctx.fillStyle="#003366";ctx.textAlign="center";ctx.font="bold 18px Microsoft JhengHei";ctx.fillText(vt,g.x2+CW/2,g.yL+g.hL/2+7);
- ctx.fillStyle="#111";ctx.textAlign="left";ctx.font="bold 16px Microsoft JhengHei";ctx.fillText(`P O₂ = ${{pt}}`,g.x2+10,g.yEq+42);
- ctx.textAlign="right";ctx.fillText("V₂",g.x2+CW-10,g.yL-12);
- ctx.strokeStyle="#000";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(g.x2,TOP);ctx.lineTo(g.x2,BOTTOM);ctx.lineTo(g.x2+CW,BOTTOM);ctx.lineTo(g.x2+CW,TOP);ctx.stroke();
- const dx=g.x2+CW+22;doubleArrow(dx,g.yInit+PH/2,g.yEq+PH/2,"#d9534f");
- ctx.fillStyle="#d9534f";ctx.textAlign="left";ctx.font="bold 17px Microsoft JhengHei";ctx.fillText("ΔV",dx+8,(g.yInit+g.yEq+PH)/2+6);
+
+const base = buildGroup(15, 1, 1, 1, "【基準對照組】 1.0 P atm、1.0 V劑", "#2b579a");
+const exp = buildGroup(715, P_EXP, V_EXP, DV_EXP, "【實驗調整組】 " + P_EXP.toFixed(1) + " P atm、" + V_EXP.toFixed(1) + " V劑", "#b02a37");
+
+function arrow(x1, y1, x2, y2, c = "#000", lw = 2) {{
+    const h = 9, a = Math.atan2(y2 - y1, x2 - x1);
+    ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = lw;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - Math.PI / 6), y2 - h * Math.sin(a - Math.PI / 6));
+    ctx.lineTo(x2 - h * Math.cos(a + Math.PI / 6), y2 - h * Math.sin(a + Math.PI / 6));
+    ctx.closePath(); ctx.fill();
 }}
-function animate(){{
- ctx.clearRect(0,0,W,H);ctx.save();ctx.strokeStyle="#ccc";ctx.lineWidth=2;ctx.setLineDash([8,6]);ctx.beginPath();ctx.moveTo(700,15);ctx.lineTo(700,H-15);ctx.stroke();ctx.restore();
- drawGroup(base);drawGroup(exp);requestAnimationFrame(animate);
+
+function doubleArrow(x, y1, y2, c) {{
+    arrow(x, (y1 + y2) / 2, x, y1, c, 2);
+    arrow(x, (y1 + y2) / 2, x, y2, c, 2);
+}}
+
+function updatePhase(g, phase) {{
+    const arr = phase === 'gas' ? g.gas : g.liq;
+    const other = phase === 'gas' ? g.liq : g.gas;
+    const interfaceY = g.yL, gasBottom = g.yEq + PH;
+    const prob = Math.min(0.22, 0.035 * SPEED);
+    for (let i = arr.length - 1; i >= 0; i--) {{
+        const p = arr[i];
+        p.x += p.vx * SPEED;
+        p.y += p.vy * SPEED;
+        if (p.x - p.r < p.xMin + 2) {{ p.x = p.xMin + p.r + 2; p.vx = Math.abs(p.vx); }}
+        if (p.x + p.r > p.xMax - 2) {{ p.x = p.xMax - p.r - 2; p.vx = -Math.abs(p.vx); }}
+        if (phase === 'gas') {{
+            if (p.y + p.r >= interfaceY && p.vy > 0) {{
+                if (Math.random() < prob) {{
+                    arr.splice(i, 1);
+                    p.y = interfaceY + p.r + 1;
+                    p.yMin = interfaceY; p.yMax = BOTTOM;
+                    p.vx *= 0.7; p.vy = Math.max(0.45, Math.abs(p.vy) * 0.7);
+                    other.push(p); continue;
+                }} else {{
+                    p.y = interfaceY - p.r - 1; p.vy = -Math.abs(p.vy);
+                }}
+            }}
+            if (p.y - p.r < gasBottom) {{ p.y = gasBottom + p.r; p.vy = Math.abs(p.vy); }}
+        }} else {{
+            if (p.y - p.r <= interfaceY && p.vy < 0) {{
+                if (Math.random() < prob) {{
+                    arr.splice(i, 1);
+                    p.y = interfaceY - p.r - 1;
+                    p.yMin = gasBottom; p.yMax = interfaceY;
+                    p.vx /= 0.7; p.vy = -Math.max(0.45, Math.abs(p.vy) / 0.7);
+                    other.push(p); continue;
+                }} else {{
+                    p.y = interfaceY + p.r + 1; p.vy = Math.abs(p.vy);
+                }}
+            }}
+            if (p.y + p.r > BOTTOM) {{ p.y = BOTTOM - p.r; p.vy = -Math.abs(p.vy); }}
+        }}
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fillStyle = "#111"; ctx.fill();
+    }}
+}}
+
+function drawStaticParticles(a) {{
+    for (const p of a) {{
+        p.x += p.vx * SPEED; p.y += p.vy * SPEED;
+        if (p.x - p.r < p.xMin + 2 || p.x + p.r > p.xMax - 2) p.vx *= -1;
+        if (p.y - p.r < p.yMin + 2 || p.y + p.r > p.yMax - 2) p.vy *= -1;
+        p.x = Math.max(p.xMin + p.r + 2, Math.min(p.xMax - p.r - 2, p.x));
+        p.y = Math.max(p.yMin + p.r + 2, Math.min(p.yMax - p.r - 2, p.y));
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fillStyle = "#111"; ctx.fill();
+    }}
+}}
+
+function drawGroup(g) {{
+    const pt = g.p === 1 ? "P atm" : g.p.toFixed(1) + "P atm";
+    const vt = g.v === 1 ? "V劑" : g.v.toFixed(1) + "V劑";
+    ctx.fillStyle = g.color; ctx.font = "bold 20px Microsoft JhengHei"; ctx.textAlign = "center";
+    ctx.fillText(g.title, g.off + 335, 32);
+    ctx.fillStyle = "#555"; ctx.font = "bold 15px Microsoft JhengHei";
+    ctx.fillText("剛接觸瞬間（未溶解）", g.x1 + CW / 2, 60);
+    ctx.fillText("溶解達平衡狀態", g.x2 + CW / 2, 60);
+
+    // 初始容器液體與活塞
+    ctx.fillStyle = "#b8daff"; ctx.fillRect(g.x1, g.yL, CW, g.hL);
+    ctx.strokeStyle = "#333"; ctx.lineWidth = 1.5; ctx.strokeRect(g.x1, g.yL, CW, g.hL);
+    ctx.fillStyle = "#003366"; ctx.font = "bold 18px Microsoft JhengHei";
+    ctx.fillText(vt, g.x1 + CW / 2, g.yL + g.hL / 2 + 7);
+    ctx.fillStyle = "#a6a6a6"; ctx.fillRect(g.x1, g.yInit, CW, PH);
+    ctx.strokeStyle = "#222"; ctx.lineWidth = 2; ctx.strokeRect(g.x1, g.yInit, CW, PH);
+    arrow(g.x1 + CW / 2, g.yInit - 45, g.x1 + CW / 2, g.yInit - 2);
+    ctx.fillStyle = "#000"; ctx.textAlign = "left"; ctx.font = "bold 16px Microsoft JhengHei";
+    ctx.fillText(pt, g.x1 + CW / 2 + 8, g.yInit - 18);
+    drawStaticParticles(g.init);
+    ctx.fillText("P O₂ = " + pt, g.x1 + 10, g.yInit + 42);
+    ctx.textAlign = "right"; ctx.fillText("V₁", g.x1 + CW - 10, g.yL - 12);
+    ctx.strokeStyle = "#000"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(g.x1, TOP); ctx.lineTo(g.x1, BOTTOM); ctx.lineTo(g.x1 + CW, BOTTOM); ctx.lineTo(g.x1 + CW, TOP); ctx.stroke();
+    ctx.fillStyle = "#000"; ctx.textAlign = "center"; ctx.font = "bold 16px Microsoft JhengHei";
+    ctx.fillText("溶解達平衡", g.x1 + CW + 65, 290);
+    arrow(g.x1 + CW + 15, 305, g.x2 - 15, 305);
+
+    // 平衡容器
+    ctx.fillStyle = "#b8daff"; ctx.fillRect(g.x2, g.yL, CW, g.hL);
+    ctx.strokeStyle = "#333"; ctx.lineWidth = 1.5; ctx.strokeRect(g.x2, g.yL, CW, g.hL);
+    ctx.save(); ctx.setLineDash([5, 5]); ctx.strokeStyle = "#666"; ctx.lineWidth = 1.8; ctx.strokeRect(g.x2, g.yInit, CW, PH); ctx.restore();
+    ctx.fillStyle = "#a6a6a6"; ctx.fillRect(g.x2, g.yEq, CW, PH);
+    ctx.strokeStyle = "#222"; ctx.lineWidth = 2; ctx.strokeRect(g.x2, g.yEq, CW, PH);
+    arrow(g.x2 + CW / 2, g.yEq - 45, g.x2 + CW / 2, g.yEq - 2);
+    ctx.fillStyle = "#000"; ctx.textAlign = "left"; ctx.font = "bold 16px Microsoft JhengHei";
+    ctx.fillText(pt, g.x2 + CW / 2 + 8, g.yEq - 18);
+    ctx.fillStyle = "#111"; updatePhase(g, "gas"); updatePhase(g, "liq");
+    ctx.fillStyle = "#003366"; ctx.textAlign = "center"; ctx.font = "bold 18px Microsoft JhengHei";
+    ctx.fillText(vt, g.x2 + CW / 2, g.yL + g.hL / 2 + 7);
+    ctx.fillStyle = "#111"; ctx.textAlign = "left"; ctx.font = "bold 16px Microsoft JhengHei";
+    ctx.fillText("P O₂ = " + pt, g.x2 + 10, g.yEq + 42);
+    ctx.textAlign = "right"; ctx.fillText("V₂", g.x2 + CW - 10, g.yL - 12);
+    ctx.strokeStyle = "#000"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(g.x2, TOP); ctx.lineTo(g.x2, BOTTOM); ctx.lineTo(g.x2 + CW, BOTTOM); ctx.lineTo(g.x2 + CW, TOP); ctx.stroke();
+    const dx = g.x2 + CW + 22;
+    doubleArrow(dx, g.yInit + PH / 2, g.yEq + PH / 2, "#d9534f");
+    ctx.fillStyle = "#d9534f"; ctx.textAlign = "left"; ctx.font = "bold 17px Microsoft JhengHei";
+    ctx.fillText("ΔV", dx + 8, (g.yInit + g.yEq + PH) / 2 + 6);
+}}
+
+function animate() {{
+    ctx.clearRect(0, 0, W, H);
+    ctx.save(); ctx.strokeStyle = "#ccc"; ctx.lineWidth = 2; ctx.setLineDash([8, 6]);
+    ctx.beginPath(); ctx.moveTo(700, 15); ctx.lineTo(700, H - 15); ctx.stroke(); ctx.restore();
+    drawGroup(base);
+    drawGroup(exp);
+    requestAnimationFrame(animate);
 }}
 animate();
-</script></body></html>
+</script>
+</body>
+</html>
 """
     return html_code
 
-components.html(render_dual_canvas(P_ratio, V_solv_ratio, dv_ratio, anim_speed), height=555, scrolling=False)
+components.html(render_dual_canvas(P_ratio, V_solv_ratio, dv_ratio, anim_speed), height=560, scrolling=False)
 
 def badge_text(mult, is_quiz):
     if is_quiz:
