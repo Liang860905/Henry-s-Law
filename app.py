@@ -116,12 +116,12 @@ ctx.scale(dpr, dpr);
 const P_EXP = {P_exp}, V_EXP = {V_exp}, DV_EXP = {dV_exp}, SPEED = {speed};
 const BOTTOM = 495, TOP = 60, CW = 200, PH = 18;
 
-// 降低粒子基數以利教學觀察，維持嚴謹的幾何與粒子對應比例
+// 維持嚴謹的幾何比例，並將基準粒子數統一設為 10，方便直接心算點數量倍數
 const GASH = 100, DVH = 40, LIQH = 60;
-const BASE_NG = 10, BASE_NL = 4; // 大幅減少粒子，讓 1V 到 2V 的變化非常明顯
+const BASE_NG = 10, BASE_NL = 10; 
 
 function createParticles(n, x1, x2, y1, y2, phase) {{
-    const a = [], r = 6; // 稍微放大粒子半徑使視覺更清晰
+    const a = [], r = 5.5; // 適度微調半徑，保持清晰與不擁擠
     for (let i = 0; i < n; i++) {{
         const ang = Math.random() * Math.PI * 2;
         const v = (1.1 + Math.random() * 1.1) * (phase === 'liq' ? 0.7 : 1);
@@ -146,7 +146,7 @@ function buildGroup(off, p, v, dv, title, color) {{
     const x1 = off + 55;
     const x2 = off + 385;
     
-    // 理論目標粒子數
+    // 嚴格理論目標粒子數（利用 Math.round 確保滑桿 0.1 微調時的四捨五入也符合比例）
     const ng = Math.round(BASE_NG * p);
     const nl = Math.round(BASE_NL * p * v);
     
