@@ -116,12 +116,12 @@ ctx.scale(dpr, dpr);
 const P_EXP = {P_exp}, V_EXP = {V_exp}, DV_EXP = {dV_exp}, SPEED = {speed};
 const BOTTOM = 495, TOP = 60, CW = 200, PH = 18;
 
-// 重新建立嚴謹的數學幾何與粒子對應比例 (保證視覺密度完全符合亨利定律)
+// 降低粒子基數以利教學觀察，維持嚴謹的幾何與粒子對應比例
 const GASH = 100, DVH = 40, LIQH = 60;
-const BASE_NG = 30, BASE_NL = 12; // 30顆對應GASH(100)，12顆對應DVH(40) -> 確保氣體密度恆定
+const BASE_NG = 10, BASE_NL = 4; // 大幅減少粒子，讓 1V 到 2V 的變化非常明顯
 
 function createParticles(n, x1, x2, y1, y2, phase) {{
-    const a = [], r = 5;
+    const a = [], r = 6; // 稍微放大粒子半徑使視覺更清晰
     for (let i = 0; i < n; i++) {{
         const ang = Math.random() * Math.PI * 2;
         const v = (1.1 + Math.random() * 1.1) * (phase === 'liq' ? 0.7 : 1);
