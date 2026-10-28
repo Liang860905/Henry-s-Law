@@ -114,7 +114,11 @@ canvas.style.aspectRatio = W + " / " + H;
 ctx.scale(dpr, dpr);
 
 const P_EXP = {P_exp}, V_EXP = {V_exp}, DV_EXP = {dV_exp}, SPEED = {speed};
-const BOTTOM = 495, TOP = 75, CW = 200, PH = 18, LIQH = 65, GASH = 115, DVH = 48;
+const BOTTOM = 495, TOP = 60, CW = 200, PH = 18;
+
+// 重新建立嚴謹的數學幾何與粒子對應比例 (保證視覺密度完全符合亨利定律)
+const GASH = 100, DVH = 40, LIQH = 60;
+const BASE_NG = 30, BASE_NL = 12; // 30顆對應GASH(100)，12顆對應DVH(40) -> 確保氣體密度恆定
 
 function createParticles(n, x1, x2, y1, y2, phase) {{
     const a = [], r = 5;
@@ -137,14 +141,18 @@ function buildGroup(off, p, v, dv, title, color) {{
     const hL = LIQH * v;
     const yL = BOTTOM - hL;
     const hD = DVH * dv;
-    const yInit = yL - GASH - DVH;
-    const yEq = yInit + hD;
+    const yInit = yL - GASH - hD;
+    const yEq = yL - GASH;
     const x1 = off + 55;
     const x2 = off + 385;
-    const nl = Math.max(2, Math.round(5 * p * v));
-    const ng = Math.max(3, Math.round(10 * p));
+    
+    // 理論目標粒子數
+    const ng = Math.round(BASE_NG * p);
+    const nl = Math.round(BASE_NL * p * v);
+    
     return {{
         off, p, v, dv, title, color, x1, x2, hL, yL, yEq, hD, yInit,
+        targetNg: ng, targetNl: nl,
         init: createParticles(ng + nl, x1, x1 + CW, yInit + PH, yL, 'gas'),
         gas: createParticles(ng, x2, x2 + CW, yEq + PH, yL, 'gas'),
         liq: createParticles(nl, x2, x2 + CW, yL, BOTTOM, 'liq')
@@ -174,16 +182,22 @@ function updatePhase(g, phase) {{
     const arr = phase === 'gas' ? g.gas : g.liq;
     const other = phase === 'gas' ? g.liq : g.gas;
     const interfaceY = g.yL, gasBottom = g.yEq + PH;
-    const prob = Math.min(0.22, 0.035 * SPEED);
+    
+    // 動態平衡基底機率
+    let baseProb = Math.min(0.22, 0.035 * SPEED);
+    
     for (let i = arr.length - 1; i >= 0; i--) {{
         const p = arr[i];
         p.x += p.vx * SPEED;
         p.y += p.vy * SPEED;
         if (p.x - p.r < p.xMin + 2) {{ p.x = p.xMin + p.r + 2; p.vx = Math.abs(p.vx); }}
         if (p.x + p.r > p.xMax - 2) {{ p.x = p.xMax - p.r - 2; p.vx = -Math.abs(p.vx); }}
+        
         if (phase === 'gas') {{
             if (p.y + p.r >= interfaceY && p.vy > 0) {{
-                if (Math.random() < prob) {{
+                // 凝結機率：加入 Bias 確保畫面粒子數緊貼亨利定律理論值
+                let bias = (g.gas.length / g.targetNg);
+                if (Math.random() < baseProb * bias) {{
                     arr.splice(i, 1);
                     p.y = interfaceY + p.r + 1;
                     p.yMin = interfaceY; p.yMax = BOTTOM;
@@ -196,7 +210,9 @@ function updatePhase(g, phase) {{
             if (p.y - p.r < gasBottom) {{ p.y = gasBottom + p.r; p.vy = Math.abs(p.vy); }}
         }} else {{
             if (p.y - p.r <= interfaceY && p.vy < 0) {{
-                if (Math.random() < prob) {{
+                // 蒸發機率：加入 Bias 確保液面下粒子不會跑光或過多
+                let bias = (g.liq.length / g.targetNl);
+                if (Math.random() < baseProb * bias) {{
                     arr.splice(i, 1);
                     p.y = interfaceY - p.r - 1;
                     p.yMin = gasBottom; p.yMax = interfaceY;
@@ -247,6 +263,7 @@ function drawGroup(g) {{
     ctx.textAlign = "right"; ctx.fillText("V₁", g.x1 + CW - 10, g.yL - 12);
     ctx.strokeStyle = "#000"; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.moveTo(g.x1, TOP); ctx.lineTo(g.x1, BOTTOM); ctx.lineTo(g.x1 + CW, BOTTOM); ctx.lineTo(g.x1 + CW, TOP); ctx.stroke();
+    
     ctx.fillStyle = "#000"; ctx.textAlign = "center"; ctx.font = "bold 16px Microsoft JhengHei";
     ctx.fillText("溶解達平衡", g.x1 + CW + 65, 290);
     arrow(g.x1 + CW + 15, 305, g.x2 - 15, 305);
@@ -260,7 +277,12 @@ function drawGroup(g) {{
     arrow(g.x2 + CW / 2, g.yEq - 45, g.x2 + CW / 2, g.yEq - 2);
     ctx.fillStyle = "#000"; ctx.textAlign = "left"; ctx.font = "bold 16px Microsoft JhengHei";
     ctx.fillText(pt, g.x2 + CW / 2 + 8, g.yEq - 18);
-    ctx.fillStyle = "#111"; updatePhase(g, "gas"); updatePhase(g, "liq");
+    
+    // 動態更新氣液交換
+    ctx.fillStyle = "#111"; 
+    updatePhase(g, "gas"); 
+    updatePhase(g, "liq");
+    
     ctx.fillStyle = "#003366"; ctx.textAlign = "center"; ctx.font = "bold 18px Microsoft JhengHei";
     ctx.fillText(vt, g.x2 + CW / 2, g.yL + g.hL / 2 + 7);
     ctx.fillStyle = "#111"; ctx.textAlign = "left"; ctx.font = "bold 16px Microsoft JhengHei";
@@ -268,6 +290,7 @@ function drawGroup(g) {{
     ctx.textAlign = "right"; ctx.fillText("V₂", g.x2 + CW - 10, g.yL - 12);
     ctx.strokeStyle = "#000"; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.moveTo(g.x2, TOP); ctx.lineTo(g.x2, BOTTOM); ctx.lineTo(g.x2 + CW, BOTTOM); ctx.lineTo(g.x2 + CW, TOP); ctx.stroke();
+    
     const dx = g.x2 + CW + 22;
     doubleArrow(dx, g.yInit + PH / 2, g.yEq + PH / 2, "#d9534f");
     ctx.fillStyle = "#d9534f"; ctx.textAlign = "left"; ctx.font = "bold 17px Microsoft JhengHei";
